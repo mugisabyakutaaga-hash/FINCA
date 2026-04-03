@@ -1,0 +1,8 @@
+{
+  "name": "FINCA Protector",
+  "description": "Digital Concierge for FINCA Uganda - Micro-insurance and Financial Inclusion",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

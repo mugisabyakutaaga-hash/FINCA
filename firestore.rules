@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (from Auth)
+    // Fields:
+    //   - uid: string (required) - User ID
+    //   - email: string (required) - User's email
+    //   - displayName: string (required) - User's name
+    //   - photoURL: string (optional) - Profile photo URL
+    //   - role: string (required, 'client'|'admin') - User's role
+    //   - category: string (optional, 'boda-boda'|'personal'|'business') - Protector category
+    //   - walletBalance: number (required) - Current wallet balance
+    //
+    // Collection: transactions
+    // Document ID: transactionId
+    // Fields:
+    //   - userId: string (required) - User ID
+    //   - amount: number (required) - Transaction amount
+    //   - type: string (required, 'deposit'|'withdrawal'|'premium-payment') - Transaction type
+    //   - status: string (required, 'pending'|'completed'|'failed') - Transaction status
+    //   - method: string (required, 'momo'|'ecobank') - Payment method
+    //   - timestamp: timestamp (required) - Transaction time
+    //   - description: string (required) - Transaction description
+    //
+    // Collection: policies
+    // Document ID: policyId
+    // Fields:
+    //   - userId: string (required) - User ID
+    //   - productId: string (required) - Product ID
+    //   - status: string (required, 'active'|'expired'|'pending') - Policy status
+    //   - startDate: timestamp (required) - Policy start date
+    //   - endDate: timestamp (required) - Policy end date
+    //   - premiumPaid: number (required) - Premium paid
+    //
+    // Collection: claims
+    // Document ID: claimId
+    // Fields:
+    //   - userId: string (required) - User ID
+    //   - policyId: string (required) - Policy ID
+    //   - status: string (required, 'pending'|'reviewing'|'approved'|'rejected') - Claim status
+    //   - description: string (required) - Claim description
+    //   - evidenceUrls: list (optional) - List of evidence URLs
+    //   - timestamp: timestamp (required) - Claim time
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "mugisabyakutaaga@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'walletBalance']) &&
+             data.uid == request.auth.uid &&
+             data.email is string &&
+             data.displayName is string && data.displayName.size() < 100 &&
+             data.role in ['client', 'admin'] &&
+             data.walletBalance is number && data.walletBalance >= 0;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['userId', 'amount', 'type', 'status', 'method', 'timestamp', 'description']) &&
+             data.userId == request.auth.uid &&
+             data.amount is number && data.amount > 0 &&
+             data.type in ['deposit', 'withdrawal', 'premium-payment'] &&
+             data.status in ['pending', 'completed', 'failed'] &&
+             data.method in ['momo', 'ecobank'] &&
+             data.timestamp is timestamp &&
+             data.description is string && data.description.size() < 200;
+    }
+
+    function isValidPolicy(data) {
+      return data.keys().hasAll(['userId', 'productId', 'status', 'startDate', 'endDate', 'premiumPaid']) &&
+             data.userId == request.auth.uid &&
+             data.productId is string &&
+             data.status in ['active', 'expired', 'pending'] &&
+             data.startDate is timestamp &&
+             data.endDate is timestamp &&
+             data.premiumPaid is number && data.premiumPaid >= 0;
+    }
+
+    function isValidClaim(data) {
+      return data.keys().hasAll(['userId', 'policyId', 'status', 'description', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.policyId is string &&
+             data.status in ['pending', 'reviewing', 'approved', 'rejected'] &&
+             data.description is string && data.description.size() < 1000 &&
+             data.timestamp is timestamp &&
+             (!('evidenceUrls' in data) || data.evidenceUrls is list);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'client' || isAdmin());
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin())) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if (isAuthenticated() && isValidTransaction(request.resource.data)) || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /policies/{policyId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if (isAuthenticated() && isValidPolicy(request.resource.data)) || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /claims/{claimId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if (isAuthenticated() && isValidClaim(request.resource.data)) || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+  }
+}

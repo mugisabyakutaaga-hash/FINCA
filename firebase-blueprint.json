@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "Stores user profile information and wallet balance.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique user ID from Firebase Auth" },
+        "email": { "type": "string", "format": "email", "description": "User's email address" },
+        "displayName": { "type": "string", "description": "User's full name" },
+        "photoURL": { "type": "string", "format": "uri", "description": "User's profile photo URL" },
+        "role": { "type": "string", "enum": ["client", "admin"], "description": "User's role in the system" },
+        "category": { "type": "string", "enum": ["boda-boda", "personal", "business"], "description": "User's protector category" },
+        "walletBalance": { "type": "number", "description": "Current wallet balance in UGX" },
+        "kycVerified": { "type": "boolean" },
+        "idNumber": { "type": "string" }
+      },
+      "required": ["uid", "email", "displayName", "role", "walletBalance"]
+    },
+    "transactions": {
+      "title": "Transaction",
+      "description": "Records wallet deposits, withdrawals, and premium payments.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["deposit", "withdrawal", "premium-payment"] },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "method": { "type": "string", "enum": ["momo", "ecobank"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" }
+      },
+      "required": ["userId", "amount", "type", "status", "method", "timestamp"]
+    },
+    "policies": {
+      "title": "Insurance Policy",
+      "description": "Stores active and expired insurance policies for users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "productId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "expired", "pending"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "premiumPaid": { "type": "number" }
+      },
+      "required": ["userId", "productId", "status", "startDate", "endDate", "premiumPaid"]
+    },
+    "claims": {
+      "title": "Insurance Claim",
+      "description": "Stores user insurance claims with evidence.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "policyId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "reviewing", "approved", "rejected"] },
+        "description": { "type": "string" },
+        "evidenceUrls": { "type": "array", "items": { "type": "string" } },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "policyId", "status", "description", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profile documents."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "transactions",
+      "description": "Global transaction records."
+    },
+    "/policies/{policyId}": {
+      "schema": "policies",
+      "description": "Global policy records."
+    },
+    "/claims/{claimId}": {
+      "schema": "claims",
+      "description": "User insurance claims."
+    }
+  }
+}
