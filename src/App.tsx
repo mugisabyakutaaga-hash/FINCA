@@ -41,9 +41,9 @@ export default function App() {
   // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        try {
+      try {
+        if (firebaseUser) {
+          const userRef = doc(db, 'users', firebaseUser.uid);
           const userDoc = await getDoc(userRef);
           if (userDoc.exists()) {
             setUser(userDoc.data() as UserProfile);
@@ -60,15 +60,26 @@ export default function App() {
             await setDoc(userRef, newUser);
             setUser(newUser);
           }
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
+        } else {
+          setUser(null);
         }
-      } else {
-        setUser(null);
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        // We still want to stop loading even if profile fetch fails
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return () => unsubscribe();
+
+    // Fallback timeout to ensure loading stops
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   // Firestore Listeners
